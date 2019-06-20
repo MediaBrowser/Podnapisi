@@ -27,16 +27,13 @@ namespace Podnapisi
         private readonly IHttpClient _httpClient;
         private readonly ILogger _logger;
         private readonly IApplicationHost _appHost;
-        private ILocalizationManager _localizationManager;
 
-        public PodnapisiSubtitleProvider(ILogger logger, IHttpClient httpClient, IFileSystem fileSystem,
-            IApplicationHost appHost, ILocalizationManager localizationManager)
+        public PodnapisiSubtitleProvider(ILogger logger, IHttpClient httpClient, IFileSystem fileSystem, IApplicationHost appHost)
         {
             _logger = logger;
             _httpClient = httpClient;
             _fileSystem = fileSystem;
             _appHost = appHost;
-            _localizationManager = localizationManager;
         }
 
         private HttpRequestOptions BaseRequestOptions => new HttpRequestOptions
@@ -48,10 +45,10 @@ namespace Podnapisi
         {
             if (language != null)
             {
-                var culture = _localizationManager.FindLanguageInfo(language);
+                var culture = CultureInfo.GetCultureInfo(language);
                 if (culture != null)
                 {
-                    return culture.ThreeLetterISOLanguageName;
+                    return culture.TwoLetterISOLanguageName;
                 }
             }
 
@@ -65,7 +62,6 @@ namespace Podnapisi
             var lang = id.Split(',')[2];
             var opts = BaseRequestOptions;
             opts.Url = $"https://www.podnapisi.net/{lang}/subtitles/{title}/{pid}/download";
-            _logger.Debug("Requesting {0}", opts.Url);
 
             using (var response = await _httpClient.GetResponse(opts).ConfigureAwait(false))
             {
@@ -85,7 +81,7 @@ namespace Podnapisi
                 return new SubtitleResponse
                 {
                     Format = fileExt,
-                    Language = NormalizeLanguage(lang),
+                    Language = lang,
                     Stream = ms
                 };
 
@@ -104,7 +100,7 @@ namespace Podnapisi
             }
 
             var url = new StringBuilder("https://www.podnapisi.net/subtitles/search/old?sXML=1");
-            url.Append($"&sL={request.TwoLetterISOLanguageName}");
+            url.Append($"&sL={NormalizeLanguage(request.TwoLetterISOLanguageName)}");
             if (request.SeriesName == null)
             {
                 url.Append($"&sK={request.Name}");
@@ -136,11 +132,13 @@ namespace Podnapisi
                 {
                     using (var reader = new StreamReader(response.Content))
                     {
-                        var settings = _xmlSettings.Create(false);
-                        settings.CheckCharacters = false;
-                        settings.IgnoreComments = true;
-                        settings.DtdProcessing = DtdProcessing.Parse;
-                        settings.MaxCharactersFromEntities = 1024;
+                        var settings = new XmlReaderSettings
+                        {
+                            CheckCharacters = false,
+                            IgnoreComments = true,
+                            DtdProcessing = DtdProcessing.Parse,
+                            MaxCharactersFromEntities = 1024
+                        };
 
                         using (var result = XmlReader.Create(reader, settings))
                         {
@@ -240,7 +238,7 @@ namespace Podnapisi
                         case "language":
                             {
                                 var lang = reader.ReadElementContentAsString();
-                                SubtitleInfo.ThreeLetterISOLanguageName = NormalizeLanguage(lang);
+                                SubtitleInfo.ThreeLetterISOLanguageName = lang;
                                 id.Append($"{lang},");
                                 break;
                             }

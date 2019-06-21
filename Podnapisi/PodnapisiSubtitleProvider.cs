@@ -13,7 +13,6 @@ using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Providers;
 using MediaBrowser.Common;
 using MediaBrowser.Model.Net;
-using MediaBrowser.Model.Xml;
 using System.Xml;
 using System.IO.Compression;
 using MediaBrowser.Model.Globalization;
@@ -156,6 +155,18 @@ namespace Podnapisi
 
                 throw;
             }
+        }
+
+        private XmlReaderSettings Create(bool enableValidation)
+        {
+            var settings = new XmlReaderSettings();
+
+            if (!enableValidation)
+            {
+                settings.ValidationType = ValidationType.None;
+            }
+
+            return settings;
         }
 
         public IEnumerable<VideoContentType> SupportedMediaTypes =>
